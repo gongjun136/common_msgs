@@ -28,7 +28,7 @@ pipeline {
                 # params.BRANCH是 origin/test_msgs，去掉origin/
                 echo "${params.BRANCH}" | sed 's#^origin/##' | tr / _ | tr "[:upper:]" "[:lower:]"
             fi
-        """, returnStdout: true).trim()        
+        """, returnStdout: true).trim()
         SONAR_TOKEN = credentials('jenkins-sonar')
         ANTHROPIC_BASE_URL = "http://146.56.245.198:4000"
         ANTHROPIC_MODEL = "MiniMax-M2.7"
