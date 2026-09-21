@@ -1,11 +1,34 @@
 pipeline {
     agent any
+    parameters {
+        string(
+            name: 'BRANCH',
+            defaultValue: 'origin/main',
+            description: '手动构建时选择要构建的分支 origin/xxx，Gitlab MR触发会自动覆盖此变量'
+        )
+    }
     environment {
+        TARGET_BRANCH = sh(
+            script: """
+                if test -n "\${gitlabTargetBranch}"; then
+                    echo "origin/\${gitlabTargetBranch}"
+                else
+                    echo "${params.BRANCH}"
+                fi
+            """,
+            returnStdout: true
+        ).trim()
+
         GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        // 新增：获取当前分支名
         BRANCH_NAME = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-        // 新增：分支名含/时自动替换为_（推荐，避免Docker镜像名斜杠歧义）
-        BRANCH_NAME_SAFE = sh(script: 'git rev-parse --abbrev-ref HEAD | tr / _ | tr "[:upper:]" "[:lower:]"', returnStdout: true).trim()
+        BRANCH_NAME_SAFE = sh(script: """
+            if test -n "\${gitlabTargetBranch}"; then
+                echo "\${gitlabTargetBranch}" | tr / _ | tr "[:upper:]" "[:lower:]"
+            else
+                # params.BRANCH是 origin/test_msgs，去掉origin/
+                echo "${params.BRANCH}" | sed 's#^origin/##' | tr / _ | tr "[:upper:]" "[:lower:]"
+            fi
+        """, returnStdout: true).trim()
         SONAR_TOKEN = credentials('jenkins-sonar')
         ANTHROPIC_BASE_URL = "http://146.56.245.198:4000"
         ANTHROPIC_MODEL = "MiniMax-M2.7"
