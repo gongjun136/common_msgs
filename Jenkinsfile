@@ -88,25 +88,47 @@ pipeline {
                 echo "${RESP}" > ai_code_review.json
                 '''
                 script {
-                    def aiRaw = readJSON file: 'ai_code_review.json'
-                    String llmOutput = aiRaw.content[0].text.trim()
-                    echo "🤖 LLM原始输出文本：${llmOutput}"
+                    try {
+                        echo "打印ai_code_review.json原始内容:"
+                        sh 'cat ai_code_review.json'
 
-                    def aiResult = new groovy.json.JsonSlurper().parseText(llmOutput)
-                    int score = aiResult.score
-                    def risk = aiResult.risk_level
-                    def problems = aiResult.problems
-                    def suggestions = aiResult.suggestions
+                        def aiRaw = readJSON file: 'ai_code_review.json'
+                        if (aiRaw.error) {
+                            error "网关返回错误: ${aiRaw.error.message}"
+                        }
+                        String llmOutput = aiRaw.content[0].text.trim()
+                        echo "🤖 LLM原始输出文本：${llmOutput}"
 
-                    echo "==================== AI代码评审结果 ===================="
-                    echo "MR代码质量得分：${score}/100"
-                    echo "风险等级：${risk}"
-                    echo "问题列表：${problems}"
-                    echo "优化建议：${suggestions}"
-                    echo "========================================================"
+                        // 1) 剥掉 <think>...</think> 推理段（MiniMax/DeepSeek 类模型会带）
+                        llmOutput = llmOutput.replaceAll(/(?s)<think>.*?<\/think>\s*/, '')
 
-                    if (score < env.SCORE_THRESHOLD.toInteger()) {
-                        error "❌ AI代码评审不通过！得分${score}，阈值${env.SCORE_THRESHOLD}，流水线终止。"
+                        // 2) 从剩余文本里截取第一个 { 到最后一个 }，兜底模型在 JSON 前后多吐字
+                        int start = llmOutput.indexOf('{')
+                        int end = llmOutput.lastIndexOf('}')
+                        if (start < 0 || end < 0 || end <= start) {
+                            error "未能在LLM输出中定位到JSON对象，原始输出见上"
+                        }
+                        String jsonStr = llmOutput.substring(start, end + 1)
+
+                        def aiResult = new groovy.json.JsonSlurper().parseText(jsonStr)
+                        int score = aiResult.score
+                        def risk = aiResult.risk_level
+                        def problems = aiResult.problems
+                        def suggestions = aiResult.suggestions
+
+                        echo "==================== AI代码评审结果 ===================="
+                        echo "MR代码质量得分：${score}/100"
+                        echo "风险等级：${risk}"
+                        echo "问题列表：${problems}"
+                        echo "优化建议：${suggestions}"
+                        echo "========================================================"
+
+                        if (score < env.SCORE_THRESHOLD.toInteger()) {
+                            error "❌ AI代码评审不通过！得分${score}，阈值${env.SCORE_THRESHOLD}"
+                        }
+                    } catch(Exception e) {
+                        echo "!!!AI评审脚本捕获异常: ${e.getMessage()}"
+                        error "AI代码评审处理失败，原始响应查看上面日志"
                     }
                 }
             }
