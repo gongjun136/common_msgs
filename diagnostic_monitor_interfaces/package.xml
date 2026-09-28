@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>diagnostic_monitor_interfaces</name>
-  <version>1.0.1</version>
+  <version>1.0.0</version>
   <description>Minimal functional-safety heartbeat and topic communication interfaces.</description>
   <maintainer email="gongjun136@gmail.com">Lightning-LM maintainers</maintainer>
   <license>Proprietary</license>
