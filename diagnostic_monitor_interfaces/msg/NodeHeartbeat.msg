@@ -10,5 +10,6 @@ uint32 heartbeat_seq
 # Incremented only when the selected real business work completes.
 uint32 work_seq
 
-# Producer-specific state in [0, 4]; see the publishing node's definition.
+# 0=not ready, 1=idle, 2=running, 3=degraded, 4=fault.
+# The diagnostic engine treats state 3 and 4 as node-state abnormalities.
 uint8 state

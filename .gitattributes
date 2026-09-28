@@ -1,0 +1,6 @@
+
+# Diagnostics interface sources are shared between Linux and Windows developers.
+diagnostic_monitor_interfaces/** text eol=lf
+diagnostic_runtime_interfaces/** text eol=lf
+driving_evaluation_interfaces/** text eol=lf
+ci/diagnostics/** text eol=lf
