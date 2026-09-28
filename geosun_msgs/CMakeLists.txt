@@ -32,6 +32,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/BrakeFrontBackPressure.msg"
   "msg/BrakeFrontBackValveElec.msg"
   "msg/ControlTorque.msg"
+  "msg/CurrentGear.msg"
   "msg/CanBreak.msg"
   "msg/CurrentVavle.msg"
   "msg/DriveSteerBrake.msg"
