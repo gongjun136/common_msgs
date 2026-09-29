@@ -1,0 +1,3 @@
+# /TMTorqueVCU_topic、/SteerPercCmdVCU_topic、/BoomSignalVCU_topic、/BucketSignalVCU_topic
+diagnostic_monitor_interfaces/TopicCommHeader comm_header
+float64 data

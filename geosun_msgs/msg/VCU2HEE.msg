@@ -1,4 +1,5 @@
 # vcu subscribe /vcu2HEE_topic message, cycle 20ms
+diagnostic_monitor_interfaces/TopicCommHeader comm_header
 std_msgs/Header header       # ROS standard message header
 
 int32      x        # 液压先导状态

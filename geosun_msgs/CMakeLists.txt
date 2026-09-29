@@ -21,6 +21,7 @@ find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED) 
 find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
+find_package(diagnostic_monitor_interfaces REQUIRED)
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -29,6 +30,10 @@ find_package(rosidl_default_generators REQUIRED)
 # custom message and service
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/AngleSensor.msg"
+  "msg/ImuPoint.msg"
+  "msg/Int8Value.msg"
+  "msg/Float64Value.msg"
+  "msg/BoolValue.msg"
   "msg/BrakeFrontBackPressure.msg"
   "msg/BrakeFrontBackValveElec.msg"
   "msg/ControlTorque.msg"
@@ -66,7 +71,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SaveMap.srv"
   "srv/GetInitPosition.srv"
   DEPENDENCIES std_msgs sensor_msgs
-  DEPENDENCIES builtin_interfaces
+  DEPENDENCIES builtin_interfaces diagnostic_monitor_interfaces
 )
 
 if(BUILD_TESTING)
