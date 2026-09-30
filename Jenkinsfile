@@ -76,7 +76,7 @@ pipeline {
                 }
             }
             steps {
-                sh(script: '''
+                sh '''
                 #!/bin/bash
                 set -e
                 set -o pipefail
@@ -148,7 +148,7 @@ pipeline {
                 echo "==== Gateway Raw Response ===="
                 echo "$RESP"
                 echo "$RESP" > ai_code_review.json
-                ''', shell: '/bin/bash')
+                '''
 
                 script {
                     try {
