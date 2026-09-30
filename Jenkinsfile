@@ -207,7 +207,7 @@ pipeline {
                         "-u root " +
                         "--cpus=8 " +
                         "--memory=8g " +
-                        "-v ${WORKSPACE}:/home/sany/work/wheel_loader/src/common/message" +
+                        "-v ${WORKSPACE}:/home/sany/work/wheel_loader/src/common/message " +
                         "-v ${WORKSPACE}/build/${SAFE_REF}:/home/sany/work/wheel_loader/build " +
                         "-v ${WORKSPACE}/install/${SAFE_REF}:/home/sany/work/wheel_loader/install " +
                         "-v ${WORKSPACE}/log/${SAFE_REF}:/home/sany/work/wheel_loader/log " +
