@@ -1,108 +1,173 @@
 pipeline {
     agent any
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+        timeout(time: 60, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
     parameters {
-        string(
-            name: 'BRANCH',
-            defaultValue: 'origin/main',
-            description: '手动构建时选择要构建的分支 origin/xxx，Gitlab MR触发会自动覆盖此变量'
+        gitParameter(
+            name: 'REF_NAME',
+            type: 'PT_BRANCH_TAG',
+            branchFilter: 'origin/(.*)',
+            defaultValue: 'release/v1.0.0',
+            description: '选择要构建的分支或标签',
+            quickFilterEnabled: true,
+            sortMode: 'DESCENDING_SMART'
+        )
+        booleanParam(
+            name: 'CLEAN_BUILD',
+            defaultValue: false,
+            description: '勾选则全量清理后重新编译（默认增量编译）'
         )
     }
-    environment {
-        TARGET_BRANCH = sh(
-            script: """
-                if test -n "\${gitlabTargetBranch}"; then
-                    echo "origin/\${gitlabTargetBranch}"
-                else
-                    echo "${params.BRANCH}"
-                fi
-            """,
-            returnStdout: true
-        ).trim()
 
-        GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-        BRANCH_NAME = sh(script: 'git rev-parse --abbrev-ref HEAD', returnStdout: true).trim()
-        BRANCH_NAME_SAFE = sh(script: """
-            if test -n "\${gitlabTargetBranch}"; then
-                echo "\${gitlabTargetBranch}" | tr / _ | tr "[:upper:]" "[:lower:]"
-            else
-                # params.BRANCH是 origin/test_msgs，去掉origin/
-                echo "${params.BRANCH}" | sed 's#^origin/##' | tr / _ | tr "[:upper:]" "[:lower:]"
-            fi
-        """, returnStdout: true).trim()
-        SONAR_TOKEN = credentials('jenkins-sonar')
-        ANTHROPIC_BASE_URL = "http://146.56.245.198:4000"
-        ANTHROPIC_MODEL = "MiniMax-M2.7"
-        SCORE_THRESHOLD = 70
-        ANTHROPIC_API_KEY = "dummy-key"
+    environment {
+        PROJECT_NAME = 'message-common'
+        BASE_IMAGE   = 'wheel_loader_release:latest'
+        WS_DIR       = '/home/sany/work/message-common'
+        SAFE_REF     = "${params.REF_NAME}".replaceAll('/', '_')
+        IMAGE_NAME   = "message-common-${SAFE_REF}:latest"
+        SONAR_TOKEN  = credentials('jenkins-sonar')
+        // AI 代码审查配置
+        ANTHROPIC_BASE_URL = "https://tokenhub.tencentmaas.com"
+        ANTHROPIC_MODEL    = "glm-5.2"
+        SCORE_THRESHOLD    = 70
+        ANTHROPIC_API_KEY  = credentials('sany-api-key')
     }
+
     stages {
+
+        stage('Prepare') {
+            steps {
+                echo "==== 1. 拉取代码 (${PROJECT_NAME}, 分支: ${params.REF_NAME}) ===="
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: "${params.REF_NAME}"]],
+                    extensions: scm.extensions + [[
+                        $class: 'SubmoduleOption',
+                        recursiveSubmodules: true,
+                        parentCredentials: true,
+                        trackingSubmodules: false
+                    ]],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                ])
+
+                sh '''
+                    set -e
+                    echo "当前 commit: $(git rev-parse HEAD)"
+                    if [ ! -f "/var/lib/jenkins/workspace/setting.sh" ]; then
+                        echo "[ERROR] 未找到 setting.sh"
+                        exit 1
+                    fi
+                    echo "setting.sh 校验通过"
+                '''
+            }
+        }
+
         stage('AI Code Review - MR Diff') {
             when {
-
-                expression { env.gitlabTargetBranch != null && env.gitlabTargetBranch.trim() != '' }
+                expression {
+                    (env.gitlabTargetBranch != null && env.gitlabTargetBranch.trim() != '') ||
+                    (env.BRANCH_NAME != null && env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'release/v1.0.0')
+                }
             }
             steps {
-                sh '''
-                #!/bin/sh
-                set -e
+                sh(script: '''
+#!/bin/bash
+set -e
+set -o pipefail
 
-                # 拉取目标分支
-                git fetch origin ${gitlabTargetBranch}
-                # 获取MR对比diff，限制长度
-                MR_DIFF=$(git diff origin/${gitlabTargetBranch}...HEAD | head -c 80000)
+rm -f mr.diff ai_code_review.json
 
-                SYSTEM_PROMPT=$(cat <<'EOF'
-                你是资深ROS2 C++工业代码评审专家。
-                分析下面git MR代码diff，输出严格JSON，禁止任何前言、解释、markdown。
-                JSON结构固定：
-                {
-                "score": 0~100整数,
-                "risk_level": "高/中/低",
-                "problems": ["问题1","问题2"],
-                "suggestions": ["建议1"]
-                }
-                评分重点检查：内存泄漏、裸指针、多线程竞态、ROS回调阻塞、资源未释放、魔法数字、硬编码、异常处理。
-                EOF
-                )
+# 确定目标分支
+if [ -n "$gitlabTargetBranch" ]; then
+    TARGET_BRANCH="$gitlabTargetBranch"
+else
+    TARGET_BRANCH="main"
+fi
 
-                USER_CONTENT=$(cat <<EOF
-                下面是本次MR代码diff内容：
-                ${MR_DIFF}
-                EOF
-                )
+echo "==== TARGET_BRANCH: $TARGET_BRANCH ===="
+echo "==== 本次变更文件列表 ===="
+git diff origin/$TARGET_BRANCH...HEAD --name-only
 
-                RESP=$(curl -s --connect-timeout 10 "${ANTHROPIC_BASE_URL}/v1/messages" \
-                -H "Content-Type: application/json" \
-                -H "x-api-key: ${ANTHROPIC_API_KEY}" \
-                -d '{
-                "model": "'"${ANTHROPIC_MODEL}"'",
-                "max_tokens": 1200,
-                "system": "'"${SYSTEM_PROMPT}"'",
-                "messages": [
-                {"role":"user","content":"'"${USER_CONTENT}"'"}
-                ]
-                }')
+# 过滤diff：保留 .msg .idl .cpp .h .hpp .c 源码文件
+git diff origin/$TARGET_BRANCH...HEAD \
+    -- '*.msg' '*.idl' '*.cpp' '*.h' '*.hpp' '*.c' \
+    --exclude=build/** \
+    --exclude=install/** \
+    --exclude=Package/** \
+    --exclude=ci/** \
+    --exclude='*.md' \
+    --exclude='*.yaml' \
+    --exclude='*.yml' \
+    --exclude='*.json' \
+| head -c 80000 > mr.diff
 
-                echo "==== Gateway Raw Response ===="
-                echo "${RESP}"
-                echo "${RESP}" > ai_code_review.json
-                '''
+echo "==== 过滤后diff文件大小 ===="
+ls -lh mr.diff
+
+if [ ! -s mr.diff ]; then
+    echo ">>> 过滤后无源码变更，跳过AI代码评审"
+    echo '{"empty_diff":true}' > ai_code_review.json
+    exit 0
+fi
+
+echo "======= 送入AI评审diff预览 ======="
+cat mr.diff
+
+SYSTEM_PROMPT='你是资深ROS2 C++工业代码评审专家。
+分析下面git MR代码diff，输出严格JSON，禁止任何前言、解释、markdown。
+JSON结构固定：
+{
+"score": 0~100整数,
+"risk_level": "高/中/低",
+"problems": ["问题1","问题2"],
+"suggestions": ["建议1"]
+}
+评分重点检查：消息定义规范性、IDL一致性、命名规范、字段类型合理性、版本兼容性、是否有未使用的消息定义。
+直接输出JSON，禁止包含标签、思考过程、markdown代码块或任何解释文字。'
+
+RESP=$(jq -n \
+--arg sys_prompt "$SYSTEM_PROMPT" \
+--arg user_content "$(cat mr.diff)" \
+--arg model "$ANTHROPIC_MODEL" \
+'{
+    "model": $model,
+    "max_tokens": 2048,
+    "system": $sys_prompt,
+    "messages": [{"role":"user","content":$user_content}]
+}' | curl -s --connect-timeout 10 "$ANTHROPIC_BASE_URL/v1/messages" \
+-H "Content-Type: application/json" \
+-H "x-api-key: $ANTHROPIC_API_KEY" \
+-d @-)
+
+echo "==== Gateway Raw Response ===="
+echo "$RESP"
+echo "$RESP" > ai_code_review.json
+''', shell: '/bin/bash')
+
                 script {
                     try {
                         echo "打印ai_code_review.json原始内容:"
                         sh 'cat ai_code_review.json'
 
                         def aiRaw = readJSON file: 'ai_code_review.json'
+                        if (aiRaw.empty_diff == true) {
+                            echo "✅ 本次无源码变更，跳过AI评审分数校验"
+                            return
+                        }
                         if (aiRaw.error) {
                             error "网关返回错误: ${aiRaw.error.message}"
                         }
                         String llmOutput = aiRaw.content[0].text.trim()
                         echo "🤖 LLM原始输出文本：${llmOutput}"
 
-                        // 1) 剥掉 <think>...</think> 推理段（MiniMax/DeepSeek 类模型会带）
-                        llmOutput = llmOutput.replaceAll(/(?s)<think>.*?<\/think>\s*/, '')
+                        llmOutput = llmOutput.replaceAll(/(?s).*?<\/think>\s*/, '')
 
-                        // 2) 从剩余文本里截取第一个 { 到最后一个 }，兜底模型在 JSON 前后多吐字
                         int start = llmOutput.indexOf('{')
                         int end = llmOutput.lastIndexOf('}')
                         if (start < 0 || end < 0 || end <= start) {
@@ -134,58 +199,157 @@ pipeline {
             }
         }
 
-        stage('构建镜像并编译message产物') {
+        stage('Build in Docker') {
             steps {
-                sh """
-                #!/bin/bash
-                set -e
-                # 镜像命名：message-common + 安全分支名 + :latest
-                IMAGE_NAME="message-common-${BRANCH_NAME_SAFE}:latest"
-                
-                docker build -f ci/Dockerfile_msgs -t \${IMAGE_NAME} .
-                
-                echo "✅ 镜像构建完成：\${IMAGE_NAME}"
-                docker images | grep message-common
-                """
+                echo "==== 3. Docker 容器内编译 (${PROJECT_NAME}) ===="
+                script {
+                    docker.image("${BASE_IMAGE}").inside(
+                        "-u root " +
+                        "--cpus=8 " +
+                        "--memory=8g " +
+                        "-v ${WORKSPACE}:/home/sany/work/message-common/src " +
+                        "-v ${WORKSPACE}/build/${SAFE_REF}:/home/sany/work/message-common/build " +
+                        "-v ${WORKSPACE}/install/${SAFE_REF}:/home/sany/work/message-common/install " +
+                        "-v ${WORKSPACE}/log/${SAFE_REF}:/home/sany/work/message-common/log " +
+                        "-v ${WORKSPACE}/publish:/home/sany/work/message-common/publish " +
+                        "-v /var/lib/jenkins/workspace/setting.sh:/home/sany/work/message-common/setting.sh:ro " +
+                        "-e DEBIAN_FRONTEND=noninteractive"
+                    ) {
+                        sh(script: '''
+#!/bin/bash
+set -e
+WS=/home/sany/work/message-common
+SETTING_SH=$WS/setting.sh
+
+cd $WS
+chown $(id -u):$(id -g) $WS
+
+if [ "${CLEAN_BUILD}" = "true" ]; then
+    echo "########## [3.1] 全量清理 ##########"
+    bash "$SETTING_SH" clean
+else
+    echo "########## [3.1] 增量编译模式 ##########"
+fi
+
+echo "########## [3.2] load env ##########"
+bash "$SETTING_SH" load env
+
+echo "########## [3.3] compile message ##########"
+bash "$SETTING_SH" compile message
+
+echo "########## [3.4] 验证 install 目录 ##########"
+ls -la install/
+echo "包数量: $(ls install/ | wc -l)"
+''', shell: '/bin/bash')
+
+                        sh(script: '''
+#!/bin/bash
+set -e
+WS=/home/sany/work/message-common
+cd $WS
+TAG="${SAFE_REF}"
+PUBLISH_DIR="$WS/publish/${TAG}"
+
+echo "########## [3.5] 打包发布产物 ##########"
+mkdir -p "$PUBLISH_DIR"
+
+tar -czf "$PUBLISH_DIR/message-common_${TAG}_install.tar.gz" install
+echo "发布包: $PUBLISH_DIR/message-common_${TAG}_install.tar.gz"
+echo "大小: $(du -sh $PUBLISH_DIR/message-common_${TAG}_install.tar.gz)"
+
+if [ -d "log" ]; then
+    tar -czf "$PUBLISH_DIR/message-common_${TAG}_log.tar.gz" log
+    echo "审计日志: $PUBLISH_DIR/message-common_${TAG}_log.tar.gz"
+fi
+
+chmod 755 "$PUBLISH_DIR"
+''', shell: '/bin/bash')
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo "==== 4. 构建 Docker 镜像 (${IMAGE_NAME}) ===="
+                sh '''
+                    set -e
+                    TAG="${SAFE_REF}"
+                    INSTALL_TARBALL="${WORKSPACE}/publish/${TAG}/message-common_${TAG}_install.tar.gz"
+
+                    TMP_DIR=$(mktemp -d)
+                    cp "$INSTALL_TARBALL" "$TMP_DIR/install.tar.gz"
+
+                    cat > "$TMP_DIR/Dockerfile" <<EOF
+FROM ${BASE_IMAGE}
+
+RUN mkdir -p /opt/ros/message-common
+COPY install.tar.gz /tmp/
+RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\
+    && rm /tmp/install.tar.gz
+
+ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\\${AMENT_PREFIX_PATH}
+ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\\${LD_LIBRARY_PATH}
+
+LABEL project="message-common" \\
+      branch="${TAG}" \\
+      description="Pre-built ROS2 message packages for wheel_loader"
+EOF
+
+                    cd "$TMP_DIR"
+                    docker build -t "${IMAGE_NAME}" .
+
+                    echo "镜像构建完成: ${IMAGE_NAME}"
+                    docker images | grep message-common
+
+                    cd /
+                    rm -rf "$TMP_DIR"
+                '''
             }
         }
 
         stage('SonarQube 代码扫描') {
             steps {
+                echo "==== 5. SonarQube 代码扫描 ===="
                 withSonarQubeEnv('SonarQube') {
                     sh '''
-                    sonar-scanner \
-                        -Dsonar.projectKey=my-project \
-                        -Dsonar.projectName=ROS2-Msg-Package \
-                        -Dsonar.projectVersion=${GIT_COMMIT_SHORT} \
-                        -Dsonar.sources=. \
-                        -Dsonar.exclusions=build/**,install/**,Package/**,**/*.md,**/*.swp \
-                        -Dsonar.host.url=http://10.233.88.16:9000 \
-                        -Dsonar.token=${SONAR_TOKEN}
+                        sonar-scanner \
+                            -Dsonar.projectKey=message-common \
+                            -Dsonar.projectName=message-common \
+                            -Dsonar.projectVersion=${SAFE_REF} \
+                            -Dsonar.sources=. \
+                            -Dsonar.sourceEncoding=UTF-8 \
+                            -Dsonar.exclusions=build/**,install/**,log/**,publish/**,**/*.tar.gz,**/*.md,**/*.swp,**/thirdparty/**,.git/** \
+                            -Dsonar.host.url=http://10.233.88.16:9000 \
+                            -Dsonar.token=${SONAR_TOKEN}
                     '''
                 }
             }
         }
 
-        stage('本地镜像清理') {
+        stage('Archive Artifacts') {
             steps {
-                sh """
-                docker image prune -f
-                """
+                echo "==== 6. 归档产物 + 复制到宿主机 /home/sany/wheel_loader/message-common/ ===="
+                sh '''
+                    set -e
+                    SRC_DIR="${WORKSPACE}/publish/${SAFE_REF}"
+                    DST_DIR="/home/sany/wheel_loader/message-common/${SAFE_REF}"
+
+                    mkdir -p "$DST_DIR"
+                    cp "$SRC_DIR"/*.tar.gz "$DST_DIR/"
+                    echo "已复制到宿主机: $DST_DIR/"
+                    ls -lh "$DST_DIR/"
+                '''
+                archiveArtifacts artifacts: "publish/${SAFE_REF}/*.tar.gz", fingerprint: true
             }
         }
     }
+
     post {
-        always {
-            
-            sh 'docker rm -f msg_build_7 || true'
-            archiveArtifacts artifacts: 'ai_code_review.json', fingerprint: true, allowEmptyArchive: true
-        }
         success {
-            echo "✅ 流水线全部执行成功！产物已经打包进镜像 message-with-msg-artifact:${GIT_COMMIT_SHORT}"
+            echo "==== 编译成功 (${PROJECT_NAME}, ${params.REF_NAME}) ===="
+            echo "==== 镜像已构建: ${IMAGE_NAME} ===="
         }
-        failure {
-            echo "❌ 流水线执行失败，请查看AI代码评审结果"
-        }
+        failure { echo "==== 编译失败 (${PROJECT_NAME}, ${params.REF_NAME}) ====" }
     }
 }
