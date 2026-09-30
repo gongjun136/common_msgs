@@ -344,7 +344,10 @@ pipeline {
                             -Dsonar.projectName=message-common \
                             -Dsonar.projectVersion=${SAFE_REF} \
                             -Dsonar.sources=. \
+                            -Dsonar.language=cxx \
                             -Dsonar.sourceEncoding=UTF-8 \
+                            -Dsonar.cxx.file.suffixes=.cpp,.cc,.cxx,.h,.hpp \
+                            -Dsonar.qualityprofile="ROS2-CXX-Custom" \
                             -Dsonar.exclusions=build/**,install/**,log/**,publish/**,**/*.tar.gz,**/*.md,**/*.swp,**/thirdparty/**,.git/** \
                             -Dsonar.host.url=http://10.233.88.16:9000 \
                             -Dsonar.token=${SONAR_TOKEN}
