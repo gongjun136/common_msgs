@@ -77,78 +77,78 @@ pipeline {
             }
             steps {
                 sh(script: '''
-#!/bin/bash
-set -e
-set -o pipefail
+                #!/bin/bash
+                set -e
+                set -o pipefail
 
-rm -f mr.diff ai_code_review.json
+                rm -f mr.diff ai_code_review.json
 
-# 确定目标分支
-if [ -n "$gitlabTargetBranch" ]; then
-    TARGET_BRANCH="$gitlabTargetBranch"
-else
-    TARGET_BRANCH="main"
-fi
+                # 确定目标分支
+                if [ -n "$gitlabTargetBranch" ]; then
+                    TARGET_BRANCH="$gitlabTargetBranch"
+                else
+                    TARGET_BRANCH="main"
+                fi
 
-echo "==== TARGET_BRANCH: $TARGET_BRANCH ===="
-echo "==== 本次变更文件列表 ===="
-git diff origin/$TARGET_BRANCH...HEAD --name-only
+                echo "==== TARGET_BRANCH: $TARGET_BRANCH ===="
+                echo "==== 本次变更文件列表 ===="
+                git diff origin/$TARGET_BRANCH...HEAD --name-only
 
-# 过滤diff：保留 .msg .idl .cpp .h .hpp .c 源码文件
-git diff origin/$TARGET_BRANCH...HEAD \
-    -- '*.msg' '*.idl' '*.cpp' '*.h' '*.hpp' '*.c' \
-    --exclude=build/** \
-    --exclude=install/** \
-    --exclude=Package/** \
-    --exclude=ci/** \
-    --exclude='*.md' \
-    --exclude='*.yaml' \
-    --exclude='*.yml' \
-    --exclude='*.json' \
-| head -c 80000 > mr.diff
+                # 过滤diff：保留 .msg .idl .cpp .h .hpp .c 源码文件
+                git diff origin/$TARGET_BRANCH...HEAD \
+                    -- '*.msg' '*.idl' '*.cpp' '*.h' '*.hpp' '*.c' \
+                    --exclude=build/** \
+                    --exclude=install/** \
+                    --exclude=Package/** \
+                    --exclude=ci/** \
+                    --exclude='*.md' \
+                    --exclude='*.yaml' \
+                    --exclude='*.yml' \
+                    --exclude='*.json' \
+                | head -c 80000 > mr.diff
 
-echo "==== 过滤后diff文件大小 ===="
-ls -lh mr.diff
+                echo "==== 过滤后diff文件大小 ===="
+                ls -lh mr.diff
 
-if [ ! -s mr.diff ]; then
-    echo ">>> 过滤后无源码变更，跳过AI代码评审"
-    echo '{"empty_diff":true}' > ai_code_review.json
-    exit 0
-fi
+                if [ ! -s mr.diff ]; then
+                    echo ">>> 过滤后无源码变更，跳过AI代码评审"
+                    echo '{"empty_diff":true}' > ai_code_review.json
+                    exit 0
+                fi
 
-echo "======= 送入AI评审diff预览 ======="
-cat mr.diff
+                echo "======= 送入AI评审diff预览 ======="
+                cat mr.diff
 
-SYSTEM_PROMPT='你是资深ROS2 C++工业代码评审专家。
-分析下面git MR代码diff，输出严格JSON，禁止任何前言、解释、markdown。
-JSON结构固定：
-{
-"score": 0~100整数,
-"risk_level": "高/中/低",
-"problems": ["问题1","问题2"],
-"suggestions": ["建议1"]
-}
-评分重点检查：消息定义规范性、IDL一致性、命名规范、字段类型合理性、版本兼容性、是否有未使用的消息定义。
-直接输出JSON，禁止包含标签、思考过程、markdown代码块或任何解释文字。'
+                SYSTEM_PROMPT='你是资深ROS2 C++工业代码评审专家。
+                分析下面git MR代码diff，输出严格JSON，禁止任何前言、解释、markdown。
+                JSON结构固定：
+                {
+                "score": 0~100整数,
+                "risk_level": "高/中/低",
+                "problems": ["问题1","问题2"],
+                "suggestions": ["建议1"]
+                }
+                评分重点检查：消息定义规范性、IDL一致性、命名规范、字段类型合理性、版本兼容性、是否有未使用的消息定义。
+                直接输出JSON，禁止包含标签、思考过程、markdown代码块或任何解释文字。'
 
-RESP=$(jq -n \
---arg sys_prompt "$SYSTEM_PROMPT" \
---arg user_content "$(cat mr.diff)" \
---arg model "$ANTHROPIC_MODEL" \
-'{
-    "model": $model,
-    "max_tokens": 2048,
-    "system": $sys_prompt,
-    "messages": [{"role":"user","content":$user_content}]
-}' | curl -s --connect-timeout 10 "$ANTHROPIC_BASE_URL/v1/messages" \
--H "Content-Type: application/json" \
--H "x-api-key: $ANTHROPIC_API_KEY" \
--d @-)
+                RESP=$(jq -n \
+                --arg sys_prompt "$SYSTEM_PROMPT" \
+                --arg user_content "$(cat mr.diff)" \
+                --arg model "$ANTHROPIC_MODEL" \
+                '{
+                    "model": $model,
+                    "max_tokens": 2048,
+                    "system": $sys_prompt,
+                    "messages": [{"role":"user","content":$user_content}]
+                }' | curl -s --connect-timeout 10 "$ANTHROPIC_BASE_URL/v1/messages" \
+                -H "Content-Type: application/json" \
+                -H "x-api-key: $ANTHROPIC_API_KEY" \
+                -d @-)
 
-echo "==== Gateway Raw Response ===="
-echo "$RESP"
-echo "$RESP" > ai_code_review.json
-''', shell: '/bin/bash')
+                echo "==== Gateway Raw Response ===="
+                echo "$RESP"
+                echo "$RESP" > ai_code_review.json
+                ''', shell: '/bin/bash')
 
                 script {
                     try {
@@ -216,54 +216,54 @@ echo "$RESP" > ai_code_review.json
                         "-e DEBIAN_FRONTEND=noninteractive"
                     ) {
                         sh(script: '''
-#!/bin/bash
-set -e
-WS=/home/sany/work/message-common
-SETTING_SH=$WS/setting.sh
+                        #!/bin/bash
+                        set -e
+                        WS=/home/sany/work/message-common
+                        SETTING_SH=$WS/setting.sh
 
-cd $WS
-chown $(id -u):$(id -g) $WS
+                        cd $WS
+                        chown $(id -u):$(id -g) $WS
 
-if [ "${CLEAN_BUILD}" = "true" ]; then
-    echo "########## [3.1] 全量清理 ##########"
-    bash "$SETTING_SH" clean
-else
-    echo "########## [3.1] 增量编译模式 ##########"
-fi
+                        if [ "${CLEAN_BUILD}" = "true" ]; then
+                            echo "########## [3.1] 全量清理 ##########"
+                            bash "$SETTING_SH" clean
+                        else
+                            echo "########## [3.1] 增量编译模式 ##########"
+                        fi
 
-echo "########## [3.2] load env ##########"
-bash "$SETTING_SH" load env
+                        echo "########## [3.2] load env ##########"
+                        bash "$SETTING_SH" load env
 
-echo "########## [3.3] compile message ##########"
-bash "$SETTING_SH" compile message
+                        echo "########## [3.3] compile message ##########"
+                        bash "$SETTING_SH" compile message
 
-echo "########## [3.4] 验证 install 目录 ##########"
-ls -la install/
-echo "包数量: $(ls install/ | wc -l)"
-''', shell: '/bin/bash')
+                        echo "########## [3.4] 验证 install 目录 ##########"
+                        ls -la install/
+                        echo "包数量: $(ls install/ | wc -l)"
+                        ''', shell: '/bin/bash')
 
-                        sh(script: '''
-#!/bin/bash
-set -e
-WS=/home/sany/work/message-common
-cd $WS
-TAG="${SAFE_REF}"
-PUBLISH_DIR="$WS/publish/${TAG}"
+                                                sh(script: '''
+                        #!/bin/bash
+                        set -e
+                        WS=/home/sany/work/message-common
+                        cd $WS
+                        TAG="${SAFE_REF}"
+                        PUBLISH_DIR="$WS/publish/${TAG}"
 
-echo "########## [3.5] 打包发布产物 ##########"
-mkdir -p "$PUBLISH_DIR"
+                        echo "########## [3.5] 打包发布产物 ##########"
+                        mkdir -p "$PUBLISH_DIR"
 
-tar -czf "$PUBLISH_DIR/message-common_${TAG}_install.tar.gz" install
-echo "发布包: $PUBLISH_DIR/message-common_${TAG}_install.tar.gz"
-echo "大小: $(du -sh $PUBLISH_DIR/message-common_${TAG}_install.tar.gz)"
+                        tar -czf "$PUBLISH_DIR/message-common_${TAG}_install.tar.gz" install
+                        echo "发布包: $PUBLISH_DIR/message-common_${TAG}_install.tar.gz"
+                        echo "大小: $(du -sh $PUBLISH_DIR/message-common_${TAG}_install.tar.gz)"
 
-if [ -d "log" ]; then
-    tar -czf "$PUBLISH_DIR/message-common_${TAG}_log.tar.gz" log
-    echo "审计日志: $PUBLISH_DIR/message-common_${TAG}_log.tar.gz"
-fi
+                        if [ -d "log" ]; then
+                            tar -czf "$PUBLISH_DIR/message-common_${TAG}_log.tar.gz" log
+                            echo "审计日志: $PUBLISH_DIR/message-common_${TAG}_log.tar.gz"
+                        fi
 
-chmod 755 "$PUBLISH_DIR"
-''', shell: '/bin/bash')
+                        chmod 755 "$PUBLISH_DIR"
+                        ''', shell: '/bin/bash')
                     }
                 }
             }
@@ -281,20 +281,20 @@ chmod 755 "$PUBLISH_DIR"
                     cp "$INSTALL_TARBALL" "$TMP_DIR/install.tar.gz"
 
                     cat > "$TMP_DIR/Dockerfile" <<EOF
-FROM ${BASE_IMAGE}
+                    FROM ${BASE_IMAGE}
 
-RUN mkdir -p /opt/ros/message-common
-COPY install.tar.gz /tmp/
-RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\
-    && rm /tmp/install.tar.gz
+                    RUN mkdir -p /opt/ros/message-common
+                    COPY install.tar.gz /tmp/
+                    RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\
+                        && rm /tmp/install.tar.gz
 
-ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\\${AMENT_PREFIX_PATH}
-ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\\${LD_LIBRARY_PATH}
+                    ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\\${AMENT_PREFIX_PATH}
+                    ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\\${LD_LIBRARY_PATH}
 
-LABEL project="message-common" \\
-      branch="${TAG}" \\
-      description="Pre-built ROS2 message packages for wheel_loader"
-EOF
+                    LABEL project="message-common" \\
+                        branch="${TAG}" \\
+                        description="Pre-built ROS2 message packages for wheel_loader"
+                    EOF
 
                     cd "$TMP_DIR"
                     docker build -t "${IMAGE_NAME}" .
@@ -304,6 +304,32 @@ EOF
 
                     cd /
                     rm -rf "$TMP_DIR"
+                '''
+            }
+        }
+
+        stage('导出产物到宿主机') {
+            steps {
+                echo "==== 从镜像导出产物到 /home/sany/wheel_loader/message-common/ ===="
+                sh '''
+                    set -e
+                    TAG="${SAFE_REF}"
+                    IMAGE="message-common-${TAG}:latest"
+                    DST_DIR="/home/sany/wheel_loader/message-common/${TAG}"
+
+                    mkdir -p "$DST_DIR"
+
+                    # 从镜像里把 install 目录拷出来
+                    # 先创建一个临时容器
+                    docker create --name tmp_export_$$ "$IMAGE"
+                    # 拷贝产物
+                    docker cp tmp_export_$$:/home/sany/work/Package/Common/message/install "$DST_DIR/"
+                    # 删除临时容器
+                    docker rm tmp_export_$$
+
+                    echo "产物已导出到: $DST_DIR/"
+                    ls -lh "$DST_DIR/install/" | head -20
+                    echo "总大小: $(du -sh $DST_DIR/install/)"
                 '''
             }
         }
