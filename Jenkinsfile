@@ -205,8 +205,8 @@ pipeline {
                 script {
                     docker.image("${BASE_IMAGE}").inside(
                         "-u root " +
-                        "--cpus=8 " +
-                        "--memory=8g " +
+                        "--cpus=14 " +
+                        "--memory=16g " +
                         "-v ${WORKSPACE}:/home/sany/work/wheel_loader/src/common/message " +
                         "-v ${WORKSPACE}/build/${SAFE_REF}:/home/sany/work/wheel_loader/build " +
                         "-v ${WORKSPACE}/install/${SAFE_REF}:/home/sany/work/wheel_loader/install " +
