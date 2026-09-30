@@ -72,14 +72,14 @@ pipeline {
             when {
                 expression {
                     (env.gitlabTargetBranch != null && env.gitlabTargetBranch.trim() != '') ||
-                    (env.BRANCH_NAME != null && env.BRANCH_NAME != 'main' && env.BRANCH_NAME != 'release/v1.0.0')
+                    (params.REF_NAME != null && params.REF_NAME != 'main' && params.REF_NAME != 'release/v1.0.0')
                 }
             }
             steps {
                 sh '''
                 #!/bin/bash
                 set -e
-                set -o pipefail
+                
 
                 rm -f mr.diff ai_code_review.json
 
