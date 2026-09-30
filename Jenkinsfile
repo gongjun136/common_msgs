@@ -28,7 +28,7 @@ pipeline {
     environment {
         PROJECT_NAME = 'message-common'
         BASE_IMAGE   = 'wheel_loader_release:latest'
-        WS_DIR       = '/home/sany/work/message-common'
+        WS_DIR       = '/home/sany/work/wheel_loader'
         SAFE_REF     = "${params.REF_NAME}".replaceAll('/', '_')
         IMAGE_NAME   = "message-common-${SAFE_REF}:latest"
         SONAR_TOKEN  = credentials('jenkins-sonar')
@@ -207,18 +207,18 @@ pipeline {
                         "-u root " +
                         "--cpus=8 " +
                         "--memory=8g " +
-                        "-v ${WORKSPACE}:/home/sany/work/message-common/src " +
-                        "-v ${WORKSPACE}/build/${SAFE_REF}:/home/sany/work/message-common/build " +
-                        "-v ${WORKSPACE}/install/${SAFE_REF}:/home/sany/work/message-common/install " +
-                        "-v ${WORKSPACE}/log/${SAFE_REF}:/home/sany/work/message-common/log " +
-                        "-v ${WORKSPACE}/publish:/home/sany/work/message-common/publish " +
-                        "-v /var/lib/jenkins/workspace/setting.sh:/home/sany/work/message-common/setting.sh:ro " +
+                        "-v ${WORKSPACE}:/home/sany/work/wheel_loader/src/common/message" +
+                        "-v ${WORKSPACE}/build/${SAFE_REF}:/home/sany/work/wheel_loader/build " +
+                        "-v ${WORKSPACE}/install/${SAFE_REF}:/home/sany/work/wheel_loader/install " +
+                        "-v ${WORKSPACE}/log/${SAFE_REF}:/home/sany/work/wheel_loader/log " +
+                        "-v ${WORKSPACE}/publish:/home/sany/work/wheel_loader/publish " +
+                        "-v /var/lib/jenkins/workspace/setting.sh:/home/sany/work/wheel_loader/setting.sh:ro " +
                         "-e DEBIAN_FRONTEND=noninteractive"
                     ) {
                         sh(script: '''
                         #!/bin/bash
                         set -e
-                        WS=/home/sany/work/message-common
+                        WS=/home/sany/work/wheel_loader
                         SETTING_SH=$WS/setting.sh
 
                         cd $WS
@@ -242,10 +242,10 @@ pipeline {
                         echo "包数量: $(ls install/ | wc -l)"
                         ''', shell: '/bin/bash')
 
-                                                sh(script: '''
+                        sh(script: '''
                         #!/bin/bash
                         set -e
-                        WS=/home/sany/work/message-common
+                        WS=/home/sany/work/wheel_loader
                         cd $WS
                         TAG="${SAFE_REF}"
                         PUBLISH_DIR="$WS/publish/${TAG}"
