@@ -236,6 +236,7 @@ pipeline {
 
                         echo "########## [3.3] compile message ##########"
                         bash "$SETTING_SH" compile message
+                        rename_msgs.sh
 
                         echo "########## [3.4] 验证 install 目录 ##########"
                         ls -la install/
