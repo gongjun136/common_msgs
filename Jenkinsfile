@@ -281,24 +281,30 @@ pipeline {
                     TMP_DIR=$(mktemp -d)
                     cp "$INSTALL_TARBALL" "$TMP_DIR/install.tar.gz"
 
-                    cat > "$TMP_DIR/Dockerfile" <<EOF
-FROM ${BASE_IMAGE}
-RUN mkdir -p /opt/ros/message-common
-COPY install.tar.gz /tmp/
-RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \
-    && rm /tmp/install.tar.gz
+                    # 写 Dockerfile（不用 heredoc，避免缩进问题）
+                    {
+                        echo "FROM ''' + BASE_IMAGE + '''"
+                        echo ""
+                        echo "RUN mkdir -p /opt/ros/message-common"
+                        echo "COPY install.tar.gz /tmp/"
+                        echo "RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\"
+                        echo "    && rm /tmp/install.tar.gz"
+                        echo ""
+                        echo "ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\\${AMENT_PREFIX_PATH}"
+                        echo "ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\\${LD_LIBRARY_PATH}"
+                        echo ""
+                        echo "LABEL project=\"message-common\" branch=\"${TAG}\""
+                    } > "$TMP_DIR/Dockerfile"
 
-ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:${AMENT_PREFIX_PATH}
-ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:${LD_LIBRARY_PATH}
+                    echo "==== Dockerfile 内容 ===="
+                    cat "$TMP_DIR/Dockerfile"
 
-LABEL project="message-common"
-DOCKERFILE
+                    cd "$TMP_DIR"
+                    docker build -t "${IMAGE_NAME}" .
 
-            cd "$TMP_DIR"
-            docker build -t "${IMAGE_NAME}" .
-
-            echo "镜像构建完成: ${IMAGE_NAME}"
-            docker images | grep message-common
+                    echo "==== 镜像构建完成 ===="
+                    echo "镜像: ${IMAGE_NAME}"
+                    docker images | grep message-common
 
                     cd /
                     rm -rf "$TMP_DIR"
@@ -317,12 +323,9 @@ DOCKERFILE
 
                     mkdir -p "$DST_DIR"
 
-                    # 从镜像里把 install 目录拷出来
-                    # 先创建一个临时容器
                     docker create --name tmp_export_$$ "$IMAGE"
-                    # 拷贝产物
-                    docker cp tmp_export_$$:/home/sany/work/Package/Common/message/install "$DST_DIR/"
-                    # 删除临时容器
+                    # 注意：产物在 /opt/ros/message-common/install/
+                    docker cp tmp_export_$$:/opt/ros/message-common/install "$DST_DIR/"
                     docker rm tmp_export_$$
 
                     echo "产物已导出到: $DST_DIR/"
