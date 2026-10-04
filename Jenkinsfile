@@ -273,44 +273,43 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 echo "==== 4. 构建 Docker 镜像 (${IMAGE_NAME}) ===="
-                sh '''
-                    set -e
-                    TAG="${SAFE_REF}"
-                    INSTALL_TARBALL="${WORKSPACE}/publish/${TAG}/message-common_${TAG}_install.tar.gz"
+                script {
+                    // 写 Dockerfile 到 workspace（没有缩进问题）
+                    def dockerfileContent = """
+FROM ${BASE_IMAGE}
 
-                    TMP_DIR=$(mktemp -d)
-                    cp "$INSTALL_TARBALL" "$TMP_DIR/install.tar.gz"
+RUN mkdir -p /opt/ros/message-common
+COPY install.tar.gz /tmp/
+RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\
+    && rm /tmp/install.tar.gz
 
-                    # 写 Dockerfile（不用 heredoc，避免缩进问题）
-                    {
-                        echo "FROM ''' + BASE_IMAGE + '''"
-                        echo ""
-                        echo "RUN mkdir -p /opt/ros/message-common"
-                        echo "COPY install.tar.gz /tmp/"
-                        echo "RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\"
-                        echo "    && rm /tmp/install.tar.gz"
-                        echo ""
-                        echo "ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\\${AMENT_PREFIX_PATH}"
-                        echo "ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\\${LD_LIBRARY_PATH}"
-                        echo ""
-                        echo "LABEL project=\"message-common\" branch=\"${TAG}\""
-                    } > "$TMP_DIR/Dockerfile"
+ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\${AMENT_PREFIX_PATH}
+ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\${LD_LIBRARY_PATH}
 
-                    echo "==== Dockerfile 内容 ===="
-                    cat "$TMP_DIR/Dockerfile"
+LABEL project="message-common" branch="${SAFE_REF}"
+""".trim()
 
-                    cd "$TMP_DIR"
-                    docker build -t "${IMAGE_NAME}" .
+                    writeFile file: 'Dockerfile', text: dockerfileContent
 
-                    echo "==== 镜像构建完成 ===="
-                    echo "镜像: ${IMAGE_NAME}"
-                    docker images | grep message-common
+                    // 复制 install.tar.gz
+                    sh '''
+                        set -e
+                        cp "${WORKSPACE}/publish/${SAFE_REF}/message-common_${SAFE_REF}_install.tar.gz" ./install.tar.gz
 
-                    cd /
-                    rm -rf "$TMP_DIR"
-                '''
+                        echo "==== Dockerfile 内容 ===="
+                        cat Dockerfile
+
+                        docker build -t "${IMAGE_NAME}" .
+
+                        echo "==== 镜像构建完成 ===="
+                        docker images | grep message-common
+
+                        rm -f install.tar.gz Dockerfile
+                    '''
+                }
             }
         }
+
 
         stage('导出产物到宿主机') {
             steps {
