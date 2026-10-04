@@ -282,26 +282,23 @@ pipeline {
                     cp "$INSTALL_TARBALL" "$TMP_DIR/install.tar.gz"
 
                     cat > "$TMP_DIR/Dockerfile" <<EOF
-                    FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE}
+RUN mkdir -p /opt/ros/message-common
+COPY install.tar.gz /tmp/
+RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \
+    && rm /tmp/install.tar.gz
 
-                    RUN mkdir -p /opt/ros/message-common
-                    COPY install.tar.gz /tmp/
-                    RUN tar -xzf /tmp/install.tar.gz -C /opt/ros/message-common/ \\
-                        && rm /tmp/install.tar.gz
+ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:${AMENT_PREFIX_PATH}
+ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:${LD_LIBRARY_PATH}
 
-                    ENV AMENT_PREFIX_PATH=/opt/ros/message-common/install:\\${AMENT_PREFIX_PATH}
-                    ENV LD_LIBRARY_PATH=/opt/ros/message-common/install/lib:\\${LD_LIBRARY_PATH}
+LABEL project="message-common"
+DOCKERFILE
 
-                    LABEL project="message-common" \\
-                        branch="${TAG}" \\
-                        description="Pre-built ROS2 message packages for wheel_loader"
-                    EOF
+            cd "$TMP_DIR"
+            docker build -t "${IMAGE_NAME}" .
 
-                    cd "$TMP_DIR"
-                    docker build -t "${IMAGE_NAME}" .
-
-                    echo "镜像构建完成: ${IMAGE_NAME}"
-                    docker images | grep message-common
+            echo "镜像构建完成: ${IMAGE_NAME}"
+            docker images | grep message-common
 
                     cd /
                     rm -rf "$TMP_DIR"
