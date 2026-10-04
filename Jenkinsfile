@@ -13,7 +13,7 @@ pipeline {
             name: 'REF_NAME',
             type: 'PT_BRANCH_TAG',
             branchFilter: 'origin/(.*)',
-            defaultValue: 'release/v1.0.0',
+            defaultValue: 'main',
             description: '选择要构建的分支或标签',
             quickFilterEnabled: true,
             sortMode: 'DESCENDING_SMART'
