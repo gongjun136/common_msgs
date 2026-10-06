@@ -1,4 +1,5 @@
 # vcu publish /Spe_Thr_CAN_4_topic message, cycle 20ms(50HZ)
+diagnostic_monitor_interfaces/TopicCommHeader comm_header
 std_msgs/Header header       # ROS standard message header
 
 float64    x           # tmspeed  行走电机转速 -15000 ~ 15000 rpm   (st1)

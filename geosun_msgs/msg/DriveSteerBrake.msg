@@ -1,4 +1,5 @@
 # vcu subscribe /Drive_Steer_Brake_cmd_topic message, cycle 20ms
+diagnostic_monitor_interfaces/TopicCommHeader comm_header
 std_msgs/Header header       # ROS standard message header
 
 float64   x        # 前进/后退方向（域控挡位切换）
