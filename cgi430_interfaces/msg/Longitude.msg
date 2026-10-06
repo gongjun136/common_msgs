@@ -1,0 +1,2 @@
+cgi430_interfaces/CanFrame frame
+float64 longitude_deg

@@ -1,0 +1,4 @@
+cgi430_interfaces/CanFrame frame
+float64 angular_rate_x_deg_s
+float64 angular_rate_y_deg_s
+float64 angular_rate_z_deg_s

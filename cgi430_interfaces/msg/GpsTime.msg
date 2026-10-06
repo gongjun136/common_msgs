@@ -1,0 +1,3 @@
+cgi430_interfaces/CanFrame frame
+uint16 gps_week
+float64 gps_time_of_week_s

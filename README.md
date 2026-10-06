@@ -5,6 +5,7 @@ Livox LiDAR integration, and vehicle-side applications.
 
 ## Repository layout
 
+- `cgi430_interfaces/`: CGI-430 typed CAN and driver-status messages; used by the driver and localization.
 - `livox_ros_driver/`: package `livox_ros_driver2`; Livox message definitions only.
 - `diagnostic_monitor_interfaces/`: functional-safety heartbeat interfaces.
 - `lightning_interfaces/`: Lightning localization interfaces.

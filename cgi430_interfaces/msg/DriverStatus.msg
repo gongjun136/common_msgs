@@ -1,0 +1,9 @@
+std_msgs/Header header
+string interface_name
+bool socket_open
+uint64 received_frames
+uint64 decoded_frames
+uint64 invalid_frames
+uint64 unknown_frames
+uint64 socket_errors
+float64 last_frame_age_s

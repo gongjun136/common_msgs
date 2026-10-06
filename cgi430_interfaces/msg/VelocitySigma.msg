@@ -1,0 +1,5 @@
+cgi430_interfaces/CanFrame frame
+float64 east_mps
+float64 north_mps
+float64 up_mps
+float64 vehicle_speed_mps

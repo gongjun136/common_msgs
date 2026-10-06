@@ -1,0 +1,8 @@
+cgi430_interfaces/CanFrame frame
+uint8 system_state
+uint8 main_antenna_sats_used
+uint8 satellite_status
+uint8 secondary_antenna_sats_used
+float64 differential_age_s
+uint8 main_antenna_sats_tracked
+uint8 secondary_antenna_sats_tracked

@@ -1,0 +1,4 @@
+cgi430_interfaces/CanFrame frame
+float64 acceleration_x_g
+float64 acceleration_y_g
+float64 acceleration_z_g
