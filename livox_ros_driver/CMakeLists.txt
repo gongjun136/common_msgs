@@ -16,12 +16,14 @@ find_package(builtin_interfaces REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(diagnostic_monitor_interfaces REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CustomPoint.msg"
   "msg/CustomMsg.msg"
   "msg/CompressedPointCloud2.msg"
-  DEPENDENCIES builtin_interfaces sensor_msgs std_msgs
+  "msg/LidarDiagnosticState.msg"
+  DEPENDENCIES builtin_interfaces sensor_msgs std_msgs diagnostic_monitor_interfaces
 )
 
 ament_export_dependencies(rosidl_default_runtime)

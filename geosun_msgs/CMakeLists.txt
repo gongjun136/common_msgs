@@ -65,6 +65,7 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PosRes.msg"
   "msg/GnssRes.msg"
   "msg/TimeSyn.msg"
+  "msg/Safty.msg"
   "msg/AbsLidRes.msg"
   "msg/WsRes.msg"
   "msg/RelocatePos.msg"

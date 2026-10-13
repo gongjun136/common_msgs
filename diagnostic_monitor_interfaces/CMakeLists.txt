@@ -9,6 +9,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
         "msg/NodeHeartbeat.msg"
         "msg/TopicCommHeader.msg"
         "msg/MonitoredSample.msg"
+        "msg/DtcObservation.msg"
+        "msg/DtcObservationArray.msg"
 )
 
 ament_export_dependencies(rosidl_default_runtime)
