@@ -23,7 +23,6 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/CustomMsg.msg"
   "msg/CompressedPointCloud2.msg"
   "msg/LidarDiagnosticState.msg"
-  "msg/LidarDeviceInfo.msg"
   DEPENDENCIES builtin_interfaces sensor_msgs std_msgs diagnostic_monitor_interfaces
 )
 

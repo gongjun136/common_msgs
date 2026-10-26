@@ -5,10 +5,10 @@ Livox LiDAR integration, and vehicle-side applications.
 
 ## Repository layout
 
-`livox_ros_driver2/msg/LidarDeviceInfo` carries the last SDK-confirmed LiDAR SN,
-role, IP, device type and confirmation time. It is an additive interface, not a
-liveness signal. Consumers must rebuild this package before the updated driver;
-existing point-cloud, IMU and diagnostic message definitions are unchanged.
+LiDAR identity is queried through the driver's standard ROS 2 parameters.
+The retired `LidarDeviceInfo` message has been removed. Rebuild into a clean
+install directory when upgrading so old generated interfaces are not retained.
+Existing point-cloud, IMU and diagnostic messages are unchanged.
 
 - `cgi430_interfaces/`: CGI-430 typed CAN and driver-status messages; used by the driver and localization.
 - `livox_ros_driver/`: package `livox_ros_driver2`; Livox message definitions only.
